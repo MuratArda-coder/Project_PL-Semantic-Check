@@ -1,0 +1,6 @@
+%rules E 2 T 3;
+E -> T
+| T + E;
+T -> int
+| int * T
+| ( E );

@@ -1,0 +1,240 @@
+%{ 
+#include<stdio.h>
+#include<stdlib.h>
+#include "myFunctions.h"
+extern FILE *yyin;
+extern int lineNum;
+
+char ruleTable[10][2];
+int size = 0;
+
+char defRule[10][2];
+int def = 0;
+
+char refRule[10];
+int ref = 0;
+
+char tokenList[10];
+int tok=0;
+/*
+it is difficult for me to make token string and
+use them in the function so that i store them as an character
+
+OPEN='o'	CLOSE='c'	int='i'		float='f'
+PLUS='p'	MINUS='m'	DIVIDE='d'	TIMES='T'
+END='e'
+*/
+char ruleList[10][20];
+int ruleN=0;
+int rule=0;
+
+%}
+
+%union
+{
+int number;
+char *string;
+char letter;
+}
+
+%token OR SEMICOLON OPEN CLOSE ARROW RULES
+
+%token <letter> NUMBER
+%token <letter> NONTERMINAL
+%token <letter> TYPE
+%token <letter> OPERATOR
+
+%type <letter> ident
+
+
+%%
+
+program:	RULES fillRules;
+
+fillRules:	NONTERMINAL NUMBER SEMICOLON continue1
+		{
+			ruleTable[size][0]=$1;
+			ruleTable[size][1]=$2;
+			size++;
+		}
+		|
+		NONTERMINAL NUMBER fillRules
+		{
+			ruleTable[size][0]=$1;
+			ruleTable[size][1]=$2;
+			size++;
+		}
+		;
+
+continue1:	getArrow continue2;
+
+getArrow:	NONTERMINAL ARROW
+		{
+			defRule[def][0] = $1;
+			defRule[def][1] = '1';
+			def++;
+		}
+		;
+		
+continue2:	writeRule SEMICOLON 
+		|
+		writeRule SEMICOLON continue1
+		;
+
+writeRule:	Xident continueToWrite
+		|
+		Xident OPERATOR operation continueToWrite
+		{
+			if($2=='+') 
+				{tokenList[tok]='p';tok++;}
+			else if($2=='-')
+				{tokenList[tok]='m';tok++;}
+			else if($2=='*')
+				{tokenList[tok]='t';tok++;}
+			else if($2=='/')
+				{tokenList[tok]='d';tok++;}
+			removeDublicatedandSize(tokenList,tok);
+		}
+		;
+
+continueToWrite	:| 
+		 OR writeRule 
+		{
+		defRule[def-1][1]++;ruleN++;rule=0;
+		}
+		 ;
+
+operation:	Xident
+		|
+		Xident OPERATOR operation
+		{
+			if($2=='+') 
+				{tokenList[tok]='p';tok++;ruleList[ruleN][rule++]='+';}
+			else if($2=='-')
+				{tokenList[tok]='m';tok++;ruleList[ruleN][rule++]='-';}
+			else if($2=='*')
+				{tokenList[tok]='t';tok++;ruleList[ruleN][rule++]='*';}
+			else if($2=='/')
+				{tokenList[tok]='d';tok++;ruleList[ruleN][rule++]='/';}
+			removeDublicatedandSize(tokenList,tok);
+		}
+		;
+		
+Xident:		OPEN ident CLOSE
+		{
+			tokenList[tok]='o';
+			tok++;
+			tokenList[tok]='c';
+			tok++;
+			removeDublicatedandSize(tokenList,tok);
+	
+			ruleList[ruleN][rule++]='(';
+			if($2='i')
+			{
+				ruleList[ruleN][rule++]='i';
+				ruleList[ruleN][rule++]='n';
+				ruleList[ruleN][rule++]='t';
+				ruleList[ruleN][rule++]=')';
+			}
+			if($2='f')
+			{
+				ruleList[ruleN][rule++]='f';
+				ruleList[ruleN][rule++]='l';
+				ruleList[ruleN][rule++]='o';
+				ruleList[ruleN][rule++]='a';
+				ruleList[ruleN][rule++]='t';
+				ruleList[ruleN][rule++]=')';
+			}
+			else {
+				ruleList[ruleN][rule++]='(';
+				ruleList[ruleN][rule++]=$2;
+				ruleList[ruleN][rule++]=')';
+			}
+			
+		}
+		|
+		ident
+		{
+			if($1='i')
+			{
+				ruleList[ruleN][rule++]='i';
+				ruleList[ruleN][rule++]='n';
+				ruleList[ruleN][rule++]='t';
+			}
+			if($1='f')
+			{
+				ruleList[ruleN][rule++]='f';
+				ruleList[ruleN][rule++]='l';
+				ruleList[ruleN][rule++]='o';
+				ruleList[ruleN][rule++]='a';
+				ruleList[ruleN][rule++]='t';
+			}
+			else {
+				ruleList[ruleN][rule++]=$1;
+			}
+		}
+		;
+
+ident:		NONTERMINAL
+		{
+			refRule[ref] = $1;
+			ref++;
+			removeDublicatedandSize(refRule,ref);
+			
+			$$=$1;
+		}
+		|
+		TYPE
+		{
+			if($1=='i') 
+				{tokenList[tok]='i';tok++;}
+			else if($1=='f')
+				{tokenList[tok]='f';tok++;}
+			removeDublicatedandSize(tokenList,tok);
+			$$=$1;
+		}
+		;
+
+	
+
+%%
+
+void yyerror(char *s){
+	fprintf(stderr,"error: %d\n",lineNum);
+}
+int yywrap(){
+	return 1;
+}
+int main(int argc, char *argv[])
+{
+	yyin=fopen(argv[1],"r");
+	yyparse();
+	fclose(yyin);
+	///C  File Will Be Created Here///
+	int i;int j;
+	int flag=0;
+	///Check is Tables Are correct///
+	for(i=0;i<size;i++) {
+		printf("Rules %d is %c and num is %c\n",i,ruleTable[i][0],ruleTable[i][1]);//++
+	}
+	for(i=0;i<def;i++) {
+		printf("Definitions %d is %c and count rules is %c\n",i,defRule[i][0],defRule[i][1]);//++
+	}
+	for(i=0;i<ref;i++) {
+		printf("Referances %d is %c \n",i,refRule[i]);//++
+	}
+	for(i=0;i<tok;i++) {
+		printf("Tokens %d is %c \n",i,tokenList[i]);//++
+	}
+	for(i=0;i<ruleN;i++) {//--
+		printf("rule %d:	",i);
+		for(j=0;i<rule;j++) {
+			printf("%c",ruleList[i][j]);
+		}
+		printf("\n");
+	}
+
+
+	////////////////////////////////
+	return 0;
+}
